@@ -134,11 +134,16 @@ main {
 .badge.card  { background: #E8F1FD; color: #1849A9; }
 .badge.ic    { background: #E9F7EF; color: #05603A; }
 .badge.warnb { background: #FEF3C7; color: #92400E; }
+.badge.solo  { background: #EEF0FB; color: #33407A; }
+.badge.src-v, .badge.src-c, .badge.src-n, .badge.src-p {
+  background: transparent; border: 1px solid var(--border); color: var(--ink-3); font-weight: 600; }
+.badge.src-p { border-color: #E5B84B; color: #8A6410; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .badge.cash  { background: #3A1A1A; color: #FCA5A5; }
   :root:not([data-theme="light"]) .badge.card  { background: #16294A; color: #93C5FD; }
   :root:not([data-theme="light"]) .badge.ic    { background: #12332A; color: #86EFAC; }
   :root:not([data-theme="light"]) .badge.warnb { background: #3B2E10; color: #FCD34D; }
+  :root:not([data-theme="light"]) .badge.solo  { background: #1E2440; color: #AFBBF0; }
 }
 
 .btns { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 11px; }
@@ -348,6 +353,20 @@ const PAY = {
   ic: ["ic", "교통카드·페이"], cashless: ["card", "카드만 (현금 불가)"],
   unknown: ["warnb", "결제수단 미확인"],
 };
+// 근거 등급 — 이 항목을 어디까지 확인했는가
+const SRC = {
+  video: ["산보노트 영상", "src-v"],
+  checked: ["타베로그 교차검증", "src-c"],
+  naver: ["방문기 교차확인", "src-n"],
+  pick: ["미검증 · 현장 확인", "src-p"],
+};
+// 혼밥 난이도 — "말을 얼마나 해야 하는가" 기준
+const SOLO = {
+  silent: "🔇 대화 0 · 식권 자판기",
+  point: "👉 메뉴 짚으면 끝",
+  counter: "🍽 카운터석 · 혼밥 기본",
+  quiet: "🤫 대화 금지 공간",
+};
 
 let store = {};
 try { store = JSON.parse(localStorage.getItem("tokyo-sanpo") || "{}"); } catch (e) { store = {}; }
@@ -412,7 +431,8 @@ function itemHTML(it, di, ii) {
   }
 
   const bd = [];
-  if (it.pay && PAY[it.pay]) bd.push(`<span class="badge ${PAY[it.pay][0]}">${PAY[it.pay][1]}</span>`);
+  // 혼밥·결제는 접힌 머리글에 이미 있으므로 여기서는 반복하지 않는다
+  if (it.src && SRC[it.src]) bd.push(`<span class="badge ${SRC[it.src][1]}">근거 · ${SRC[it.src][0]}</span>`);
   if (it.tabelog) bd.push(`<span class="badge">타베로그 ${esc(it.tabelog)}</span>`);
   (it.badges || []).forEach(b => bd.push(`<span class="badge">${esc(b)}</span>`));
   if (bd.length) body += `<div class="btns" style="gap:6px">${bd.join("")}</div>`;
@@ -437,6 +457,7 @@ function itemHTML(it, di, ii) {
 
   // 접힌 목록에는 결제수단만 남긴다. 영상 배지는 거의 모든 항목에 붙어 변별력이 없었다.
   const quick = [];
+  if (it.solo && SOLO[it.solo]) quick.push(`<span class="badge solo">${SOLO[it.solo]}</span>`);
   if (it.pay && PAY[it.pay]) quick.push(`<span class="badge ${PAY[it.pay][0]}">${PAY[it.pay][1]}</span>`);
 
   return `<div class="item${done}" id="it-${id}">
@@ -671,9 +692,15 @@ function renderInfo() {
       <div class="rt" style="font-size:14px;font-weight:800">이 일정의 근거</div>
       <p class="note" style="margin-top:6px">${esc(TRIP.meta.channel.note)}
         영상 표시가 붙은 항목은 채널이 직접 다룬 곳이고, 탭하면 해당 구간부터 재생됩니다.</p>
-      <div class="warn">타베로그는 제작 환경에서 접속이 차단되어 개별 가게의 평점·영업일을 새로 확인하지 못했습니다.
-        표시된 평점은 이전 조사에서 교차검증된 값이고, 후보로만 제시한 가게에는 평점을 적지 않았습니다.
-        방문 전에 구글맵으로 영업 상태를 한 번 확인하세요.</div>
+      <div class="info-row"><div class="rt">근거 등급</div><div class="rd">
+        각 항목에 어디까지 확인했는지를 붙여 뒀습니다.<br>
+        <b>산보노트 영상</b> · 채널이 직접 다룬 장소<br>
+        <b>타베로그 교차검증</b> · 평점·영업일까지 확인된 식당 (평점은 이 등급에만 표기)<br>
+        <b>방문기 교차확인</b> · 한국어 방문기 다수로 실재·혼밥 가능까지 확인. 평점은 적지 않음<br>
+        <b>미검증</b> · 동선상 후보. 현장 확인이 전제</div></div>
+      <div class="warn">타베로그는 제작 환경에서 접속이 차단되어 새로 조회하지 못했습니다.
+        그래서 평점을 지어내는 대신 등급을 나눴습니다. 개인 가게의 정기휴일은 바뀌기 쉬우니
+        방문 전에 구글맵 영업 상태를 한 번 보는 습관을 권합니다.</div>
       <div class="btns"><a class="btn" href="${esc(TRIP.meta.channel.playlist)}" target="_blank" rel="noopener">재생목록 열기</a></div>
     </div>`;
 }
