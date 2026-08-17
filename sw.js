@@ -6,7 +6,9 @@
  *
  * 캐시를 갈아엎으려면 VERSION을 올린다.
  */
-const VERSION = "v1";
+const VERSION = "v2";
+// 일정 내용(data.js)의 버전. index.html의 <script src="data.js?v=..."> 와 반드시 같아야 한다.
+const DATA_V = "2";
 
 const SHELL = `sanpo-shell-${VERSION}`;
 const VENDOR = `sanpo-vendor-${VERSION}`;
@@ -18,7 +20,7 @@ const INDEX_URL = new URL("./", self.location).href;
 
 const SHELL_URLS = [
   "./",
-  "./data.js",
+  `./data.js?v=${DATA_V}`,
   "./manifest.webmanifest",
   "./icons/icon-180.png",
   "./icons/icon-192.png",
@@ -73,7 +75,15 @@ self.addEventListener("fetch", (e) => {
 
   if (url.hostname === "unpkg.com") { e.respondWith(staleWhileRevalidate(request, VENDOR)); return; }
 
-  if (url.origin === self.location.origin) { e.respondWith(cacheFirst(request, SHELL)); }
+  if (url.origin === self.location.origin) {
+    // 일정 데이터는 내용이 자주 바뀐다. 캐시 우선으로 두면 앱이 영영 옛 일정을 보여준다.
+    // 문서와 같은 네트워크 우선 + 캐시 폴백으로 처리한다.
+    if (url.pathname.endsWith("/data.js") || url.pathname.endsWith("data.js")) {
+      e.respondWith(networkFirst(request, SHELL));
+      return;
+    }
+    e.respondWith(cacheFirst(request, SHELL));
+  }
 });
 
 const isTile = (h) => h === "tile.openstreetmap.org" || h.endsWith(".tile.openstreetmap.org");
@@ -89,6 +99,22 @@ async function handleNavigation(request) {
     return await withTimeout(fetching, NAV_TIMEOUT_MS);
   } catch (err) {
     const cached = await cache.match(INDEX_URL);
+    if (cached) return cached;
+    return fetching;
+  }
+}
+
+// 네트워크 우선 + 캐시 폴백. 온라인이면 항상 최신, 끊기면 마지막으로 받은 내용.
+async function networkFirst(request, name) {
+  const cache = await caches.open(name);
+  const fetching = fetch(request).then((res) => {
+    if (res && res.ok) cache.put(request, res.clone()).catch(() => {});
+    return res;
+  });
+  try {
+    return await withTimeout(fetching, NAV_TIMEOUT_MS);
+  } catch (err) {
+    const cached = await cache.match(request);
     if (cached) return cached;
     return fetching;
   }

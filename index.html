@@ -17,8 +17,19 @@
 <script>
 // Leaflet 로드 실패와 무관하게 등록되도록 본문 스크립트와 분리해 둔다.
 if ("serviceWorker" in navigator) {
+  // 이미 서비스 워커가 붙어 있던 상태에서 새 버전이 올라오면 한 번만 새로고침한다.
+  // 이게 없으면 새 캐시가 다음 실행에야 반영돼 옛 일정을 계속 보게 된다.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload();
+  });
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch(e => console.warn("SW 등록 실패", e));
+    navigator.serviceWorker.register("sw.js")
+      .then(reg => reg.update().catch(() => {}))
+      .catch(e => console.warn("SW 등록 실패", e));
   });
 }
 </script>
@@ -331,7 +342,9 @@ main {
 </div>
 <div id="toast"></div>
 
-<script src="data.js"></script>
+<!-- ?v= 는 캐시 버스팅. 일정 내용을 고치면 이 숫자와 sw.js의 DATA_V를 함께 올린다.
+     URL이 달라지면 옛 서비스 워커의 캐시에도 없으므로 즉시 새 내용을 받는다. -->
+<script src="data.js?v=2"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* ═══════════ 유틸 ═══════════ */
