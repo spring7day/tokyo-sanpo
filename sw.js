@@ -6,9 +6,9 @@
  *
  * 캐시를 갈아엎으려면 VERSION을 올린다.
  */
-const VERSION = "v4";
+const VERSION = "v5";
 // 일정 내용(data.js)의 버전. index.html의 <script src="data.js?v=..."> 와 반드시 같아야 한다.
-const DATA_V = "4";
+const DATA_V = "5";
 
 const SHELL = `sanpo-shell-${VERSION}`;
 const VENDOR = `sanpo-vendor-${VERSION}`;
