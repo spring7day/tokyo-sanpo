@@ -379,7 +379,7 @@ main {
 
 <!-- ?v= 는 캐시 버스팅. 일정 내용을 고치면 이 숫자와 sw.js의 DATA_V를 함께 올린다.
      URL이 달라지면 옛 서비스 워커의 캐시에도 없으므로 즉시 새 내용을 받는다. -->
-<script src="data.js?v=9"></script>
+<script src="data.js?v=10"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* ═══════════ 유틸 ═══════════ */
@@ -488,6 +488,11 @@ function whereAmI() {
         권한을 껐다면 좌표 없이 장소 이름만으로 물어보셔도 됩니다.</p>
       <div class="btns"><button class="btn" onclick="closeLoc()">닫기</button></div>`);
   }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
+}
+
+function copyText(text) {
+  try { navigator.clipboard && navigator.clipboard.writeText(text).catch(() => {}); } catch (e) {}
+  toast("복사했습니다 · 단축어에 붙여넣으세요");
 }
 
 function copyAsk(id) {
@@ -841,6 +846,8 @@ function renderInfo() {
             href="${ytLink(r.vid.id, r.vid.sec)}" target="_blank" rel="noopener">▶ ${esc(r.vid.label)}</a></div>` : ""}
           ${r.link ? `<div class="btns"><a class="btn ask" href="${esc(r.link.url)}"
             target="_blank" rel="noopener">${esc(r.link.label)}</a></div>` : ""}
+          ${r.copy ? `<div class="btns"><button class="btn pri"
+            onclick="copyText(${JSON.stringify(r.copy).replace(/"/g, "&quot;")})">⧉ 프롬프트 복사</button></div>` : ""}
         </div>`).join("")}</div></div>`).join("") + `
     <div class="card" style="padding:15px">
       <div class="rt" style="font-size:14px;font-weight:800">숙소</div>
