@@ -284,9 +284,17 @@ main {
   box-shadow: 0 1px 5px rgba(0,0,0,.35); }
 
 /* ===== 정보 ===== */
+/* 제목 줄이 '눌리는 것'으로 보여야 한다. 작은 화살표만으로는 알아채기 어려웠다. */
 .info-q { width: 100%; text-align: left; padding: 14px 15px; font-size: 14.5px;
-  font-weight: 750; display: flex; justify-content: space-between; align-items: center; }
-.info-a { display: none; padding: 0 15px 14px; }
+  font-weight: 750; display: flex; justify-content: space-between; align-items: center;
+  gap: 10px; background: var(--surface-2); }
+.info-q .ar { flex: 0 0 26px; height: 26px; border-radius: 50%;
+  background: var(--surface); color: var(--accent); font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); transition: transform .2s; }
+.info-item.open .info-q .ar { transform: rotate(180deg); }
+.info-item.open .info-q { background: var(--surface); border-bottom: 1px solid var(--border); }
+.info-a { display: none; padding: 6px 15px 14px; }
 .info-item.open .info-a { display: block; }
 .info-row { padding: 11px 0; border-top: 1px solid var(--border); }
 .info-row .rt { font-size: 13.5px; font-weight: 750; }
@@ -379,7 +387,7 @@ main {
 
 <!-- ?v= 는 캐시 버스팅. 일정 내용을 고치면 이 숫자와 sw.js의 DATA_V를 함께 올린다.
      URL이 달라지면 옛 서비스 워커의 캐시에도 없으므로 즉시 새 내용을 받는다. -->
-<script src="data.js?v=11"></script>
+<script src="data.js?v=12"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* ═══════════ 유틸 ═══════════ */
@@ -836,7 +844,7 @@ function renderMap() {
 /* ═══════════ 정보 ═══════════ */
 function renderInfo() {
   $("#v-info").innerHTML = TRIP.info.map((g, i) => `
-    <div class="card info-item" id="info-${i}">
+    <div class="card info-item${g.open ? " open" : ""}" id="info-${i}">
       <button class="info-q" onclick="document.getElementById('info-${i}').classList.toggle('open')">
         ${esc(g.k)}<span class="ar">▾</span></button>
       <div class="info-a">${g.items.map(r => `
