@@ -387,7 +387,7 @@ main {
 
 <!-- ?v= 는 캐시 버스팅. 일정 내용을 고치면 이 숫자와 sw.js의 DATA_V를 함께 올린다.
      URL이 달라지면 옛 서비스 워커의 캐시에도 없으므로 즉시 새 내용을 받는다. -->
-<script src="data.js?v=13"></script>
+<script src="data.js?v=14"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* ═══════════ 유틸 ═══════════ */
@@ -614,7 +614,9 @@ function itemHTML(it, di, ii) {
   }
 
   const acts = [];
-  if (it.ll || it.q) acts.push(`<a class="btn pri" href="${gmap(q)}" target="_blank" rel="noopener">🗺 구글맵</a>`);
+  // 거리·구역처럼 이름으로는 검색되지 않는 곳은 mapq(좌표)로 핀을 찍는다.
+  const mq = it.mapq || q;
+  if (it.ll || it.q) acts.push(`<a class="btn pri" href="${gmap(mq)}" target="_blank" rel="noopener">🗺 구글맵</a>`);
   if (it.kind === "food" && it.q) acts.push(`<a class="btn" href="${tabelog(q)}" target="_blank" rel="noopener">타베로그</a>`);
   if (it.vid) acts.push(`<a class="btn yt" href="${ytLink(it.vid.id, it.vid.sec)}" target="_blank" rel="noopener">▶ 영상 ${mm(it.vid.sec)}</a>`);
   if (it.link) acts.push(`<a class="btn" href="${esc(it.link.url)}" target="_blank" rel="noopener">${esc(it.link.label)}</a>`);
@@ -697,7 +699,7 @@ function renderNow() {
       ${cur.it.jp ? `<div class="jp">${esc(cur.it.jp)}</div>` : ""}
       <div class="cd">${cur.it.t} 시작 · ${Math.floor((nm - cur.m) / 60) ? Math.floor((nm - cur.m) / 60) + "시간 " : ""}${(nm - cur.m) % 60}분 경과</div>
       <div class="btns">
-        ${cur.it.q ? `<a class="btn pri" href="${gmap(cur.it.q)}" target="_blank" rel="noopener">🗺 구글맵</a>` : ""}
+        ${cur.it.q ? `<a class="btn pri" href="${gmap(cur.it.mapq || cur.it.q)}" target="_blank" rel="noopener">🗺 구글맵</a>` : ""}
         <a class="btn ask" href="${CLAUDE_NEW}${encodeURIComponent(nowAsk(cur.it, day, di, cur.i))}"
           target="_blank" rel="noopener" onclick="copyAsk('${"d" + di + "i" + cur.i}')">✦ 클로드</a>
         <button class="btn" onclick="goPlan(${di}, '${"d" + di + "i" + cur.i}')">일정에서 열기</button>
@@ -710,7 +712,7 @@ function renderNow() {
       ${next.it.jp ? `<div class="jp">${esc(next.it.jp)}</div>` : ""}
       <div class="cd">${next.it.t} · ${Math.floor(left / 60) ? Math.floor(left / 60) + "시간 " : ""}${left % 60}분 뒤</div>
       <div class="btns">
-        ${next.it.q ? `<a class="btn pri" href="${gmap(next.it.q)}" target="_blank" rel="noopener">🗺 구글맵</a>` : ""}
+        ${next.it.q ? `<a class="btn pri" href="${gmap(next.it.mapq || next.it.q)}" target="_blank" rel="noopener">🗺 구글맵</a>` : ""}
         <button class="btn" onclick="goPlan(${di}, '${"d" + di + "i" + next.i}')">일정에서 열기</button>
       </div></div>`;
   } else if (cur) {
@@ -832,7 +834,7 @@ function renderMap() {
       L.marker(it.ll, { icon: L.divIcon({ className: "", html:
         `<div class="pin" style="background:${color}">${k}</div>`, iconSize: [26, 26] }) })
         .bindPopup(`<b>${esc(it.t)} ${esc(it.title)}</b><br>
-          <a href="${gmap(it.q || it.title)}" target="_blank" rel="noopener">구글맵 열기</a>`)
+          <a href="${gmap(it.mapq || it.q || it.title)}" target="_blank" rel="noopener">구글맵 열기</a>`)
         .addTo(layer);
     });
     if (pts.length > 1) L.polyline(pts, { color: "#2B3A67", weight: 3, opacity: .5, dashArray: "6 6" }).addTo(layer);
