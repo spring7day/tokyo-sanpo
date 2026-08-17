@@ -345,7 +345,7 @@ main {
 
 <!-- ?v= 는 캐시 버스팅. 일정 내용을 고치면 이 숫자와 sw.js의 DATA_V를 함께 올린다.
      URL이 달라지면 옛 서비스 워커의 캐시에도 없으므로 즉시 새 내용을 받는다. -->
-<script src="data.js?v=3"></script>
+<script src="data.js?v=4"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* ═══════════ 유틸 ═══════════ */
@@ -366,24 +366,19 @@ const mm = s => { const m = Math.floor(s / 60), x = s % 60; return `${m}:${Strin
 const ASK = {};
 const CLAUDE_NEW = "https://claude.ai/new?q=";
 
+// 질문은 넣지 않는다. 여행 상황 한 줄과 장소 정보만 채우고,
+// 무엇을 물을지는 사용자가 직접 이어서 쓴다.
 function askPrompt(it, day) {
-  // 주소가 있으면 일본어명+주소, 없으면 일본어명만. 둘 다 없을 때만 검색어를 쓴다.
-  const where = [it.jp, it.addr].filter(Boolean).join(" · ") || it.q || "";
-  const head = `도쿄 여행 중이야. ${day ? `${day.date.slice(5).replace("-", "/")} ` : ""}지금 「${it.title}」에 가려고 해.`
-    + (where ? ` (${where})` : "");
-  const me = "40대 남자 혼자 여행이고, 조용한 걸 좋아하고 일본어는 거의 못 해.";
-
-  if (it.kind === "food") {
-    return `${head}\n${me}\n여기서 알아두면 좋을 걸 알려줘 — 주문 요령, 혼자 앉기 편한 자리, 결제 방식, 대기 시간 같은 것들.`
-      + (it.order ? ` 주문하려는 메뉴는 ${it.order.name}이야.` : "");
-  }
-  if (it.kind === "rest") {
-    return `${head}\n${me}\n여기서 조용히 쉬려는데 이용할 때 알아두면 좋을 것들을 알려줘.`;
-  }
-  if (it.kind === "move") {
-    return `도쿄 여행 중이야. ${it.title} 구간을 이동하려고 해.\n${me}\n주의할 점이나 더 나은 경로가 있으면 알려줘.`;
-  }
-  return `${head}\n${me} 35mm 한 대로 사진 찍으며 걷는 중이야.\n여기서 놓치면 아쉬운 것, 사진으로 담기 좋은 지점, 이 시간대 빛이 어떤지 알려줘.`;
+  const lines = [];
+  lines.push(`도쿄 혼자 여행 중이야.${day ? ` ${day.date.slice(5).replace("-", "/")} (${day.dow})` : ""}`);
+  lines.push("");
+  lines.push(`「${it.title}」${it.jp ? " " + it.jp : ""}`);
+  if (it.addr) lines.push(it.addr);
+  else if (it.q && it.q !== it.jp) lines.push(it.q);
+  if (it.cat) lines.push(it.cat);
+  if (it.order) lines.push(`주문 예정: ${it.order.name}`);
+  lines.push("");
+  return lines.join("\n");
 }
 
 // '지금' 화면에서도 쓸 수 있도록 등록해 두고 프롬프트를 돌려준다
