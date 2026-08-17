@@ -304,6 +304,26 @@ main {
 #phrase .x { position: absolute; top: calc(var(--safe-top) + 14px); right: 18px;
   font-size: 15px; font-weight: 700; color: var(--ink-3); padding: 8px; }
 
+/* ===== 전역 위치 버튼 ===== */
+#fab {
+  position: fixed; right: 16px; z-index: 70;
+  bottom: calc(var(--tab-h) + var(--safe-bottom) + 16px);
+  width: 54px; height: 54px; border-radius: 50%;
+  background: #D97757; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 5px 18px rgba(0,0,0,.3);
+}
+#fab svg { width: 24px; height: 24px; }
+#fab:active { transform: scale(.94); }
+
+#loc { position: fixed; inset: 0; z-index: 180; display: none;
+  background: rgba(0,0,0,.45); align-items: flex-end; }
+#loc.on { display: flex; }
+#loc .sheet { width: 100%; background: var(--surface);
+  border-radius: 20px 20px 0 0; padding: 20px 18px calc(20px + var(--safe-bottom));
+  max-height: 80vh; overflow-y: auto; }
+.ls-t { font-size: 17px; font-weight: 800; letter-spacing: -.01em; margin-bottom: 8px; }
+
 #toast { position: fixed; left: 50%; transform: translateX(-50%) translateY(20px);
   bottom: calc(var(--tab-h) + var(--safe-bottom) + 16px); z-index: 150;
   background: var(--ink); color: var(--bg); padding: 11px 18px; border-radius: 999px;
@@ -336,6 +356,18 @@ main {
 
 <nav id="tabs"></nav>
 
+<button id="fab" onclick="whereAmI()" aria-label="지금 내 위치로 물어보기">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="3.2"/><path d="M12 2v3.2M12 18.8V22M2 12h3.2M18.8 12H22"/>
+    <circle cx="12" cy="12" r="7.4"/>
+  </svg>
+</button>
+
+<div id="loc" onclick="if(event.target===this)closeLoc()">
+  <div class="sheet"><div id="loc-body"></div></div>
+</div>
+
 <div id="phrase" onclick="closePhrase()">
   <button class="x" onclick="closePhrase()">닫기</button>
   <div class="jp" id="phrase-jp"></div>
@@ -345,7 +377,7 @@ main {
 
 <!-- ?v= 는 캐시 버스팅. 일정 내용을 고치면 이 숫자와 sw.js의 DATA_V를 함께 올린다.
      URL이 달라지면 옛 서비스 워커의 캐시에도 없으므로 즉시 새 내용을 받는다. -->
-<script src="data.js?v=6"></script>
+<script src="data.js?v=7"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* ═══════════ 유틸 ═══════════ */
@@ -388,6 +420,72 @@ function nowAsk(it, day, di, i) {
   const id = "d" + di + "i" + i;
   ASK[id] = askPrompt(it, day);
   return ASK[id];
+}
+
+/* ── 전역: 지금 내 위치로 물어보기 ──
+ * 일정과 무관하게 움직일 때 쓴다. 좌표를 주소로 바꿔 넣되,
+ * 역지오코딩이 실패해도 좌표와 지도 링크만으로 성립하게 만든다.
+ */
+function locPrompt(la, ln, addr) {
+  const day = TRIP.days[todayIndex(new Date())];
+  const lines = [];
+  lines.push(`도쿄 혼자 여행 중이야.${day ? ` ${day.date.slice(5).replace("-", "/")} (${day.dow})` : ""}`);
+  lines.push("답변은 밖에서 폰으로 보니까 짧게 해줘. 장소나 위치를 언급할 때는 구글맵 링크를 하이퍼링크로 같이 달아줘.");
+  lines.push("");
+  lines.push("지금 내 위치");
+  if (addr) lines.push(addr);
+  lines.push(`좌표 ${la.toFixed(6)}, ${ln.toFixed(6)}`);
+  lines.push(`https://www.google.com/maps/search/?api=1&query=${la.toFixed(6)},${ln.toFixed(6)}`);
+  lines.push("");
+  return lines.join("\n");
+}
+
+function locSheet(html) {
+  $("#loc-body").innerHTML = html;
+  $("#loc").classList.add("on");
+}
+function closeLoc() { $("#loc").classList.remove("on"); }
+
+function whereAmI() {
+  locSheet(`<div class="ls-t">위치를 확인하는 중…</div>
+    <p class="note">GPS는 네트워크가 없어도 동작합니다. 처음이라면 권한을 물어봅니다.</p>`);
+  if (!navigator.geolocation) {
+    locSheet(`<div class="ls-t">위치를 쓸 수 없습니다</div>
+      <p class="note">이 브라우저가 위치 기능을 지원하지 않습니다.</p>`);
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    const la = pos.coords.latitude, ln = pos.coords.longitude;
+    let addr = "";
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${la}&lon=${ln}&accept-language=ja`,
+        { headers: { Accept: "application/json" } });
+      if (r.ok) {
+        const j = await r.json();
+        addr = (j && j.display_name) ? String(j.display_name) : "";
+      }
+    } catch (e) { /* 주소 변환 실패 — 좌표만으로 진행한다 */ }
+
+    ASK.__loc = locPrompt(la, ln, addr);
+    const g = `https://www.google.com/maps/search/?api=1&query=${la.toFixed(6)},${ln.toFixed(6)}`;
+    locSheet(`
+      <div class="ls-t">지금 내 위치</div>
+      ${addr ? `<p class="note" style="margin-bottom:6px">${esc(addr)}</p>`
+             : `<p class="note" style="margin-bottom:6px">주소를 가져오지 못했습니다. 좌표로 물어봅니다.</p>`}
+      <p class="kv" style="margin-top:2px">${la.toFixed(5)}, ${ln.toFixed(5)}</p>
+      <div class="btns">
+        <a class="btn ask" href="${CLAUDE_NEW}${encodeURIComponent(ASK.__loc)}"
+           target="_blank" rel="noopener" onclick="copyAsk('__loc');closeLoc()">✦ 클로드에 물어보기</a>
+        <a class="btn pri" href="${g}" target="_blank" rel="noopener">🗺 지도</a>
+        <button class="btn" onclick="closeLoc()">닫기</button>
+      </div>`);
+  }, (err) => {
+    locSheet(`<div class="ls-t">위치를 가져오지 못했습니다</div>
+      <p class="note">설정 → 개인정보 보호 → 위치 서비스에서 Safari(또는 이 앱)의 권한을 확인해 주세요.
+        권한을 껐다면 좌표 없이 장소 이름만으로 물어보셔도 됩니다.</p>
+      <div class="btns"><button class="btn" onclick="closeLoc()">닫기</button></div>`);
+  }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
 }
 
 function copyAsk(id) {
