@@ -165,6 +165,7 @@ main {
 }
 .btn.pri { background: var(--navy); color: #fff; }
 .btn.yt  { background: var(--accent); color: #fff; }
+.btn.ask { background: #D97757; color: #fff; }
 .btn:active { opacity: .65; }
 
 .note { font-size: 13.5px; line-height: 1.62; color: var(--ink-2); }
@@ -344,7 +345,7 @@ main {
 
 <!-- ?v= 는 캐시 버스팅. 일정 내용을 고치면 이 숫자와 sw.js의 DATA_V를 함께 올린다.
      URL이 달라지면 옛 서비스 워커의 캐시에도 없으므로 즉시 새 내용을 받는다. -->
-<script src="data.js?v=2"></script>
+<script src="data.js?v=3"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* ═══════════ 유틸 ═══════════ */
@@ -356,6 +357,50 @@ const tabelog = q => "https://tabelog.com/rstLst/?sk=" + encodeURIComponent(q);
 const ytLink = (id, sec) => `https://www.youtube.com/watch?v=${id}&t=${Math.max(0, sec | 0)}s`;
 const ytThumb = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 const mm = s => { const m = Math.floor(s / 60), x = s % 60; return `${m}:${String(x).padStart(2, "0")}`; };
+
+/* ═══════════ 클로드에 물어보기 ═══════════
+ * 항목의 맥락(장소·주소·오늘 일정·혼자 여행이라는 조건)을 미리 채워 둔다.
+ * claude.ai/new?q= 로 프리필을 시도하되, 앱이 못 받는 경우를 대비해
+ * 누르는 순간 클립보드에도 복사한다. 붙여넣기 한 번이면 이어진다.
+ */
+const ASK = {};
+const CLAUDE_NEW = "https://claude.ai/new?q=";
+
+function askPrompt(it, day) {
+  // 주소가 있으면 일본어명+주소, 없으면 일본어명만. 둘 다 없을 때만 검색어를 쓴다.
+  const where = [it.jp, it.addr].filter(Boolean).join(" · ") || it.q || "";
+  const head = `도쿄 여행 중이야. ${day ? `${day.date.slice(5).replace("-", "/")} ` : ""}지금 「${it.title}」에 가려고 해.`
+    + (where ? ` (${where})` : "");
+  const me = "40대 남자 혼자 여행이고, 조용한 걸 좋아하고 일본어는 거의 못 해.";
+
+  if (it.kind === "food") {
+    return `${head}\n${me}\n여기서 알아두면 좋을 걸 알려줘 — 주문 요령, 혼자 앉기 편한 자리, 결제 방식, 대기 시간 같은 것들.`
+      + (it.order ? ` 주문하려는 메뉴는 ${it.order.name}이야.` : "");
+  }
+  if (it.kind === "rest") {
+    return `${head}\n${me}\n여기서 조용히 쉬려는데 이용할 때 알아두면 좋을 것들을 알려줘.`;
+  }
+  if (it.kind === "move") {
+    return `도쿄 여행 중이야. ${it.title} 구간을 이동하려고 해.\n${me}\n주의할 점이나 더 나은 경로가 있으면 알려줘.`;
+  }
+  return `${head}\n${me} 35mm 한 대로 사진 찍으며 걷는 중이야.\n여기서 놓치면 아쉬운 것, 사진으로 담기 좋은 지점, 이 시간대 빛이 어떤지 알려줘.`;
+}
+
+// '지금' 화면에서도 쓸 수 있도록 등록해 두고 프롬프트를 돌려준다
+function nowAsk(it, day, di, i) {
+  const id = "d" + di + "i" + i;
+  ASK[id] = askPrompt(it, day);
+  return ASK[id];
+}
+
+function copyAsk(id) {
+  const text = ASK[id];
+  if (!text) return;
+  try {
+    navigator.clipboard && navigator.clipboard.writeText(text).catch(() => {});
+  } catch (e) {}
+  toast("질문을 복사했습니다 · 클로드가 열립니다");
+}
 
 const KIND = {
   stay: ["🏨", "숙소"], food: ["🍜", "식사"], spot: ["📍", "장소"],
@@ -463,6 +508,12 @@ function itemHTML(it, di, ii) {
   if (it.kind === "food" && it.q) acts.push(`<a class="btn" href="${tabelog(q)}" target="_blank" rel="noopener">타베로그</a>`);
   if (it.vid) acts.push(`<a class="btn yt" href="${ytLink(it.vid.id, it.vid.sec)}" target="_blank" rel="noopener">▶ 영상 ${mm(it.vid.sec)}</a>`);
   if (it.link) acts.push(`<a class="btn" href="${esc(it.link.url)}" target="_blank" rel="noopener">${esc(it.link.label)}</a>`);
+
+  // 클로드에 물어보기 — 장소 맥락을 미리 채운 새 대화를 연다
+  ASK[id] = askPrompt(it, TRIP.days[di]);
+  acts.push(`<a class="btn ask" href="${CLAUDE_NEW}${encodeURIComponent(ASK[id])}"
+    target="_blank" rel="noopener" onclick="copyAsk('${id}')">✦ 클로드에 물어보기</a>`);
+
   if (acts.length) body += `<div class="btns">${acts.join("")}</div>`;
 
   body += `<button class="done-btn" onclick="toggleDone('${id}', this)">
@@ -537,6 +588,8 @@ function renderNow() {
       <div class="cd">${cur.it.t} 시작 · ${Math.floor((nm - cur.m) / 60) ? Math.floor((nm - cur.m) / 60) + "시간 " : ""}${(nm - cur.m) % 60}분 경과</div>
       <div class="btns">
         ${cur.it.q ? `<a class="btn pri" href="${gmap(cur.it.q)}" target="_blank" rel="noopener">🗺 구글맵</a>` : ""}
+        <a class="btn ask" href="${CLAUDE_NEW}${encodeURIComponent(nowAsk(cur.it, day, di, cur.i))}"
+          target="_blank" rel="noopener" onclick="copyAsk('${"d" + di + "i" + cur.i}')">✦ 클로드</a>
         <button class="btn" onclick="goPlan(${di}, '${"d" + di + "i" + cur.i}')">일정에서 열기</button>
       </div></div>`;
   }
